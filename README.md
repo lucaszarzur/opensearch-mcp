@@ -1,93 +1,156 @@
-# opensearch-mcp
+# OpenSearch MCP Server
 
-MCP Server for querying OpenSearch / OpenSearch Dashboards logs via the Kibana console proxy — designed for SAML/SSO environments where direct API access is not available.
+![version](https://img.shields.io/badge/version-1.0.0-blue)
+![node](https://img.shields.io/badge/node-%3E%3D18-brightgreen)
+![license](https://img.shields.io/badge/license-ISC-lightgrey)
+![auth](https://img.shields.io/badge/auth-SAML%2FSSO%20cookie-orange)
 
-Tested with **SAP Cloud Logging Service (CLS)** on OpenSearch 2.19.x.
+MCP server para consulta de logs em ambientes **OpenSearch / OpenSearch Dashboards** que usam autenticação SAML/SSO — sem acesso direto à API.
 
-## How it works
+---
 
-All requests are proxied through the OpenSearch Dashboards console endpoint:
+## Por que este MCP existe?
+
+Em ambientes corporativos com SSO (como o **SAP Cloud Logging Service — CLS**), o OpenSearch não expõe sua API diretamente para tokens de serviço. O acesso é feito exclusivamente via sessão autenticada no browser.
+
+Este servidor resolve isso roteando todas as requisições pelo proxy do OpenSearch Dashboards:
 
 ```
 POST <DASHBOARD_URL>/api/console/proxy?path=<encoded-path>&method=<METHOD>&dataSourceId=
 ```
 
-Authentication is done via a browser session cookie (obtained after SSO login), passed as the `Cookie` request header alongside `osd-xsrf: true`.
+A autenticação é feita com o cookie de sessão do browser, passado como header `Cookie` junto com `osd-xsrf: true`.
 
-## Requirements
+| Ambiente | MCP genérico | Este MCP |
+|----------|-------------|----------|
+| OpenSearch com API key / usuário+senha | ✅ | ✅ |
+| OpenSearch com SAML/SSO (sem acesso direto) | ❌ | ✅ |
+| SAP Cloud Logging Service (CLS) | ❌ | ✅ |
 
-- Node.js 18+
-- Access to an OpenSearch Dashboards instance (SAML/SSO)
+---
 
-## Installation
+## Pré-requisitos
+
+- Node.js >= 18
+- Acesso ao OpenSearch Dashboards via browser (SSO)
+
+---
+
+## Instalação e configuração
+
+### 1. Clone e instale
 
 ```bash
+git clone https://github.com/<seu-usuario>/opensearch-mcp
+cd opensearch-mcp
 npm install
 ```
 
-## Configuration
+### 2. Obtenha o cookie de sessão
 
-| Env var | Required | Description |
-|---------|----------|-------------|
-| `OPENSEARCH_DASHBOARD_URL` | ✅ | Base URL of the dashboard (no trailing slash) |
-| `OPENSEARCH_COOKIE` | ✅ | Full `Cookie:` header value from an authenticated browser session |
-| `OPENSEARCH_DEFAULT_INDEX` | — | Default index pattern (default: `logs-json-*`) |
+1. Abra o dashboard no browser
+2. Faça login via SSO se solicitado
+3. Abra o DevTools (F12) → aba **Network**
+4. Recarregue a página (F5)
+5. Clique em qualquer requisição para o domínio do dashboard → **Headers** → **Request Headers** → copie o valor completo do campo `Cookie:`
 
-### How to get the session cookie
+> O cookie expira quando a sessão SSO expira. Use o tool `get_cookie_instructions` dentro do Claude para rever este guia a qualquer momento.
 
-1. Open the dashboard in your browser
-2. Log in via SSO if prompted
-3. Open DevTools (F12) → **Network** tab
-4. Reload the page
-5. Click any request to the dashboard domain → **Headers** → **Request Headers** → copy the full `Cookie:` value
-6. Set it as `OPENSEARCH_COOKIE` in your MCP config
+### 3. Adicione ao Claude Code
 
-> The cookie expires when your SSO session expires. Run the `get_cookie_instructions` tool inside Claude to get this guide at any time.
-
-## Registering with Claude Code
+Você pode registrar múltiplos ambientes com nomes distintos:
 
 ```bash
+# Ambiente de produção
 claude mcp add opensearch-prod -s user \
-  -e OPENSEARCH_DASHBOARD_URL=https://your-dashboard-url \
-  -e OPENSEARCH_COOKIE="your-cookie-here" \
-  -- node /path/to/opensearch-mcp/index.js
+  -e OPENSEARCH_DASHBOARD_URL="https://dashboards-sf-<id>.cls.eu20.hana.ondemand.com" \
+  -e OPENSEARCH_COOKIE="security_authentication=..." \
+  -- node /caminho/para/opensearch-mcp/index.js
+
+# Ambiente de QA
+claude mcp add opensearch-qa -s user \
+  -e OPENSEARCH_DASHBOARD_URL="https://dashboards-sf-<id-qa>.cls.eu20.hana.ondemand.com" \
+  -e OPENSEARCH_COOKIE="security_authentication=..." \
+  -- node /caminho/para/opensearch-mcp/index.js
 ```
 
-Use `-s user` for global scope (available in all projects) or `-s local` for project scope.
+Use `-s user` para escopo global (disponível em todos os projetos) ou `-s local` para escopo do projeto.
 
-## Available tools
+### Variáveis de ambiente
 
-| Tool | Description |
-|------|-------------|
-| `search_logs` | Search logs with Lucene query, time range, size and sort |
-| `count_logs` | Count matching documents without fetching content |
-| `aggregate_logs` | `date_histogram` or `terms` aggregation over a field |
-| `list_indices` | List indices matching a pattern with doc count and size |
-| `get_field_mappings` | Discover available fields and types for an index |
-| `get_cookie_instructions` | Step-by-step guide to obtain or renew the session cookie |
+| Variável | Obrigatória | Descrição |
+|----------|-------------|-----------|
+| `OPENSEARCH_DASHBOARD_URL` | ✅ | URL base do dashboard, sem barra no final |
+| `OPENSEARCH_COOKIE` | ✅ | Valor completo do header `Cookie:` copiado do browser |
+| `OPENSEARCH_DEFAULT_INDEX` | — | Index pattern padrão (default: `logs-json-*`) |
 
-## Field naming (SAP CLS)
+### 4. Teste a conexão
 
-| Purpose | Field |
-|---------|-------|
-| Log text | `logs.message` |
-| Pod name | `kubernetes.pod_name` |
+Após adicionar, reinicie o Claude Code e peça:
+
+```
+Liste os índices disponíveis no OpenSearch
+```
+
+Se o MCP estiver funcionando, o Claude usará automaticamente as ferramentas disponíveis.
+
+---
+
+## Exemplo de uso
+
+**Prompt:**
+```
+Busque logs de erro do pod accstorefront-74cb8bc69c-dcpjl na última hora
+```
+
+**O Claude orquestra as chamadas automaticamente:**
+
+```
+→ search_logs (query: "kubernetes.pod_name:accstorefront-74cb8bc69c-dcpjl AND logs.message:ERROR", from: "now-1h")
+→ aggregate_logs (aggType: terms, field: logs.loggerName)
+```
+
+---
+
+## Nomes de campos (SAP CLS)
+
+| Finalidade | Campo |
+|------------|-------|
+| Texto do log | `logs.message` |
+| Nome do pod | `kubernetes.pod_name` |
 | Timestamp | `@timestamp` (UTC) |
+| Logger | `logs.loggerName` |
 
-> **Timezone note:** all timestamps are UTC. If your team works in BRT (UTC-3), 21:15 BRT = 00:15 UTC next day.
+> **Fuso horário:** todos os timestamps são UTC. BRT = UTC-3 (ex: 21:15 BRT = 00:15 UTC do dia seguinte).
 
-## Query examples
+## Exemplos de query
 
 ```
-# All logs from a specific pod
-kubernetes.pod_name:accstorefront-74cb8bc69c-dcpjl
-
-# Exact phrase in log text
+# Texto exato no log
 logs.message:"saveFromNotificationRequest"
 
-# PSP reference anywhere in the message
+# PSP reference em qualquer parte da mensagem
 logs.message:L3LNPHHBFXHSRWX3
 
-# Errors from a pod name pattern
-logs.message:ERROR AND kubernetes.pod_name:accstorefront*
+# Erros de um pod específico
+logs.message:ERROR AND kubernetes.pod_name:accstorefront-74cb8bc69c-dcpjl
+
+# Qualquer pod com padrão de nome
+kubernetes.pod_name:accstorefront*
 ```
+
+---
+
+## Ferramentas disponíveis (6)
+
+### Logs
+- `search_logs` — Busca logs com query Lucene, intervalo de tempo, tamanho e ordenação
+- `count_logs` — Conta documentos sem buscar conteúdo
+- `aggregate_logs` — Agregação `date_histogram` (volume ao longo do tempo) ou `terms` (top valores de um campo)
+
+### Índices e Schema
+- `list_indices` — Lista índices com contagem de documentos e tamanho em disco
+- `get_field_mappings` — Descobre campos disponíveis e seus tipos em um índice
+
+### Autenticação
+- `get_cookie_instructions` — Guia passo a passo para obter ou renovar o cookie de sessão
