@@ -144,7 +144,7 @@ server.tool(
       'IMPORTANT: timestamps are UTC. BRT = UTC-3 (e.g. 21:15 BRT = 00:15 UTC next day).'
     ),
     index: z.string().optional().default(DEFAULT_INDEX).describe(`Index pattern. Default: "${DEFAULT_INDEX}"`),
-    from: z.string().optional().default("now-1h").describe('Start time in UTC. Examples: "now-1h", "now-24h", "2026-04-13T00:10:00" (= 21:10 BRT prev day)'),
+    from: z.string().optional().describe('Start time in UTC. ALWAYS specify for historical analysis — omitting defaults to now-1h which will produce incorrect results. Examples: "now-24h", "now-7d", "2026-04-13T00:10:00" (= 21:10 BRT prev day)'),
     to: z.string().optional().default("now").describe("End time. Default: now"),
     size: z.number().int().min(1).max(500).optional().default(50).describe("Max results. Default: 50"),
     sort: z.enum(["desc", "asc"]).optional().default("desc").describe("Sort by timestamp. Default: desc (newest first)"),
@@ -152,6 +152,7 @@ server.tool(
     timestampField: z.string().optional().default("@timestamp").describe('Timestamp field. Default: "@timestamp"'),
   },
   async ({ query, index, from, to, size, sort, fields, timestampField }) => {
+    const effectiveFrom = from ?? "now-1h";
     const body = {
       query: {
         bool: {
@@ -159,7 +160,7 @@ server.tool(
             { query_string: { query, default_field: "logs.message", analyze_wildcard: true } },
           ],
           filter: [
-            { range: { [timestampField]: { gte: from, lte: to } } },
+            { range: { [timestampField]: { gte: effectiveFrom, lte: to } } },
           ],
         },
       },
@@ -173,9 +174,10 @@ server.tool(
     const total = data.hits?.total?.value ?? data.hits?.total ?? 0;
     const hits = data.hits?.hits ?? [];
 
-    if (!hits.length) return ok(`No logs found for: "${query}" [${from} → ${to}]`);
+    if (!hits.length) return ok(`No logs found for: "${query}" [${effectiveFrom} → ${to}]`);
 
-    const lines = [`Found ${total} log(s) (showing ${hits.length}) — "${query}" [${from} → ${to}]\n`];
+    const lines = [`Found ${total} log(s) (showing ${hits.length}) — "${query}" [${effectiveFrom} → ${to}]\n`];
+    if (!from) lines.unshift("⚠️  WARNING: 'from' not specified — results cover the last 1h only. For historical analysis always pass an explicit 'from' date (e.g. \"now-7d\" or \"2026-04-01T00:00:00Z\").\n");
     for (const hit of hits) {
       lines.push(fields?.length ? JSON.stringify(hit._source) : formatHit(hit));
     }
@@ -194,22 +196,24 @@ server.tool(
   {
     query: z.string().describe('Lucene query. Field: logs.message. Example: "logs.message:\\"OutOfMemoryError\\"". Timestamps are UTC.'),
     index: z.string().optional().default(DEFAULT_INDEX).describe(`Index pattern. Default: "${DEFAULT_INDEX}"`),
-    from: z.string().optional().default("now-1h").describe("Start time (UTC)"),
+    from: z.string().optional().describe('Start time (UTC). ALWAYS specify for historical analysis — omitting defaults to now-1h. Examples: "now-24h", "now-7d", "2026-04-01T00:00:00Z"'),
     to: z.string().optional().default("now").describe("End time (UTC)"),
     timestampField: z.string().optional().default("@timestamp").describe('Timestamp field. Default: "@timestamp"'),
   },
   async ({ query, index, from, to, timestampField }) => {
+    const effectiveFrom = from ?? "now-1h";
     const body = {
       query: {
         bool: {
           must: [{ query_string: { query, default_field: "logs.message", analyze_wildcard: true } }],
-          filter: [{ range: { [timestampField]: { gte: from, lte: to } } }],
+          filter: [{ range: { [timestampField]: { gte: effectiveFrom, lte: to } } }],
         },
       },
     };
 
     const data = await osFetch(`/${index}/_count`, "POST", body);
-    return ok(`Count for "${query}" in [${from} → ${to}]: ${data.count ?? 0} document(s)`);
+    const warning = !from ? "⚠️  WARNING: 'from' not specified — count covers last 1h only.\n" : "";
+    return ok(`${warning}Count for "${query}" in [${effectiveFrom} → ${to}]: ${data.count ?? 0} document(s)`);
   }
 );
 
@@ -223,7 +227,7 @@ server.tool(
   {
     query: z.string().optional().default("*").describe('Filter query. Field: logs.message. Example: "logs.message:ERROR". Default: "*"'),
     index: z.string().optional().default(DEFAULT_INDEX).describe(`Index pattern. Default: "${DEFAULT_INDEX}"`),
-    from: z.string().optional().default("now-1h").describe("Start time (UTC)"),
+    from: z.string().optional().describe('Start time (UTC). ALWAYS specify for historical analysis — omitting defaults to now-1h. Examples: "now-24h", "now-7d", "2026-04-01T00:00:00Z"'),
     to: z.string().optional().default("now").describe("End time (UTC)"),
     aggType: z.enum(["date_histogram", "terms"]).describe(
       '"date_histogram" – count over time | "terms" – top N values of a field'
@@ -238,6 +242,7 @@ server.tool(
     timestampField: z.string().optional().default("@timestamp").describe('Timestamp field. Default: "@timestamp"'),
   },
   async ({ query, index, from, to, aggType, field, interval, size, timestampField }) => {
+    const effectiveFrom = from ?? "now-1h";
     const agg = aggType === "date_histogram"
       ? { date_histogram: { field, calendar_interval: interval, min_doc_count: 1 } }
       : { terms: { field, size } };
@@ -247,7 +252,7 @@ server.tool(
       query: {
         bool: {
           must: [{ query_string: { query, default_field: "logs.message", analyze_wildcard: true } }],
-          filter: [{ range: { [timestampField]: { gte: from, lte: to } } }],
+          filter: [{ range: { [timestampField]: { gte: effectiveFrom, lte: to } } }],
         },
       },
       aggs: { result: agg },
@@ -256,9 +261,10 @@ server.tool(
     const data = await osFetch(`/${index}/_search`, "POST", body);
     const buckets = data.aggregations?.result?.buckets ?? [];
 
-    if (!buckets.length) return ok(`No results for "${query}" [${from} → ${to}]`);
+    if (!buckets.length) return ok(`No results for "${query}" [${effectiveFrom} → ${to}]`);
 
-    const lines = [`${aggType} on "${field}" for "${query}" [${from} → ${to}]:\n`];
+    const lines = [`${aggType} on "${field}" for "${query}" [${effectiveFrom} → ${to}]:\n`];
+    if (!from) lines.unshift("⚠️  WARNING: 'from' not specified — results cover last 1h only. For historical analysis always pass an explicit 'from' date (e.g. \"now-7d\" or \"2026-04-01T00:00:00Z\").\n");
     for (const b of buckets) {
       lines.push(`  ${b.key_as_string || b.key}: ${b.doc_count} docs`);
     }
