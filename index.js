@@ -345,22 +345,16 @@ server.tool(
 
     return ok(
       `${status}\n\n` +
-      `Como obter o cookie de sessão do OpenSearch Dashboards:\n\n` +
-      `  1. Abra o dashboard no navegador:\n` +
-      `     ${DASHBOARD_URL}\n\n` +
-      `  2. Faça login via SSO (SAML) se solicitado.\n\n` +
-      `  3. Abra o DevTools do navegador:\n` +
-      `     Chrome/Edge: F12 ou Ctrl+Shift+I\n` +
-      `     Firefox:     F12 ou Ctrl+Shift+I\n\n` +
-      `  4. Vá na aba "Network" (Rede).\n\n` +
-      `  5. Recarregue a página (F5).\n\n` +
-      `  6. Clique em qualquer requisição listada para o domínio do dashboard.\n\n` +
-      `  7. Em "Headers" → "Request Headers", localize o campo "Cookie:".\n\n` +
-      `  8. Copie o valor completo (começa com algo como "security_authentication=...").\n\n` +
-      `  9. Atualize o env var OPENSEARCH_COOKIE no config do MCP:\n` +
-      `     Arquivo: ~/.claude/claude_mcp_settings.json (ou settings.local.json)\n` +
-      `     Campo:   "env": { "OPENSEARCH_COOKIE": "<cole aqui>" }\n\n` +
-      `  10. Reinicie a sessão do Claude Code para o novo cookie ser carregado.\n\n` +
+      `COOKIE EXPIRADO? Siga estes passos:\n\n` +
+      `  1. Abra no navegador: ${DASHBOARD_URL}\n` +
+      `  2. Faça login via SSO/SAML.\n` +
+      `  3. F12 → aba Network → recarregue (F5) → clique em qualquer request do dashboard.\n` +
+      `  4. Em Headers → Request Headers → copie o valor completo do campo "Cookie:".\n` +
+      `  5. Cole aqui no chat: "cookie prod: <valor>" ou "cookie dev: <valor>".\n\n` +
+      `O Claude vai atualizar o arquivo ~/.claude.json automaticamente.\n\n` +
+      `Localização manual (se preferir editar direto):\n` +
+      `  Arquivo: ~/.claude.json → mcpServers → opensearch-dev ou opensearch-prod → env → OPENSEARCH_COOKIE\n\n` +
+      `  6. Reinicie a sessão do Claude Code para o novo cookie ser carregado.\n\n` +
       `Dica: o cookie expira quando a sessão SSO expira (geralmente horas ou dias).`
     );
   }
