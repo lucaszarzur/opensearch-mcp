@@ -48,6 +48,17 @@ npm install
 
 ### 2. Obtenha o cookie de sessão
 
+#### Opção A: Extensão Chrome (recomendado)
+
+1. Abra `chrome://extensions` e ative **Modo do desenvolvedor**
+2. Clique em **Carregar sem compactacao** e selecione a pasta `chrome-extension/` deste repositório
+3. Navegue até o dashboard OpenSearch (QA, PROD ou DEV)
+4. Clique no ícone da extensão:
+   - **Copiar Cookie** — copia o cookie cru para a área de transferência
+   - **Copiar Comando de Update** — copia o comando `update-opensearch-cookie` pronto para colar no terminal
+
+#### Opção B: Manual (DevTools)
+
 1. Abra o dashboard no browser
 2. Faça login via SSO se solicitado
 3. Abra o DevTools (F12) → aba **Network**
@@ -90,7 +101,29 @@ Use `-s user` para escopo global (disponível em todos os projetos) ou `-s local
 | `OPENSEARCH_COOKIE` | ✅ | Valor completo do header `Cookie:` copiado do browser |
 | `OPENSEARCH_DEFAULT_INDEX` | — | Index pattern padrão (default: `logs-json-*`) |
 
-### 4. Teste a conexão
+### 4. Atualizando o cookie (quando expirar)
+
+#### Com o script CLI
+
+```bash
+# Copie o cookie (via extensão Chrome ou DevTools) e rode:
+update-opensearch-cookie qa   '<cookie>'
+update-opensearch-cookie prod '<cookie>'
+update-opensearch-cookie dev  '<cookie>'
+```
+
+O script atualiza automaticamente todas as ocorrências do ambiente no `~/.claude.json`.
+
+> Para disponibilizar o script globalmente, adicione ao PATH: `export PATH="$HOME/tools:$PATH"` no `~/.bashrc`, ou crie um symlink: `ln -s /app/IA/opensearch-mcp/update-opensearch-cookie ~/tools/update-opensearch-cookie`
+
+#### Com a extensão Chrome
+
+1. Abra o dashboard OpenSearch do ambiente desejado
+2. Clique na extensão → **Copiar Comando de Update**
+3. Cole no terminal
+4. Reinicie o Claude Code
+
+### 5. Teste a conexão
 
 Após adicionar, reinicie o Claude Code e peça:
 
@@ -160,3 +193,12 @@ kubernetes.pod_name:accstorefront*
 
 ### Autenticação
 - `get_cookie_instructions` — Guia passo a passo para obter ou renovar o cookie de sessão
+
+---
+
+## Utilitários incluídos
+
+| Ferramenta | Caminho | Descricao |
+|------------|---------|-----------|
+| Extensão Chrome | `chrome-extension/` | Extrai cookies do dashboard OpenSearch com um clique |
+| Script CLI | `update-opensearch-cookie` | Atualiza o cookie no `~/.claude.json` via terminal |
