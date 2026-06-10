@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "OpenSearch Cookie Extractor",
+  "version": "1.0",
+  "description": "Extrai cookies do OpenSearch Dashboard (QA/PROD/DEV) para uso no Claude Code MCP",
+  "permissions": ["cookies", "activeTab", "clipboardWrite"],
+  "host_permissions": [
+    "https://dashboards-sf-319b82a2-e9a7-4320-85db-27b0083a17ea.cls-01.cloud.logs.services.eu10.hana.ondemand.com/*",
+    "https://dashboards-sf-292f3c27-60fb-40e8-a3dc-1e1c752b62e0.cls-01.cloud.logs.services.eu10.hana.ondemand.com/*",
+    "https://dashboards-sf-8eec26fa-9400-4359-a510-78b36f4395f8.cls-01.cloud.logs.services.eu10.hana.ondemand.com/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": "icon.png"
+  },
+  "icons": {
+    "48": "icon.png",
+    "128": "icon.png"
+  }
+}

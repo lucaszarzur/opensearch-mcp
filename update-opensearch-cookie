@@ -1,0 +1,68 @@
+#!/usr/bin/env python3
+"""
+Atualiza o OPENSEARCH_COOKIE no ~/.claude.json para o ambiente especificado.
+
+Uso:
+  update-opensearch-cookie qa   'cookie_value'
+  update-opensearch-cookie prod 'cookie_value'
+  update-opensearch-cookie dev  'cookie_value'
+"""
+import json
+import sys
+import os
+from pathlib import Path
+
+ENV_DASHBOARD_URLS = {
+    "qa":   "dashboards-sf-319b82a2",
+    "prod": "dashboards-sf-292f3c27",
+    "dev":  "dashboards-sf-8eec26fa",
+}
+
+def update_cookie(data, dashboard_hash, new_cookie):
+    count = 0
+    if isinstance(data, dict):
+        if "OPENSEARCH_DASHBOARD_URL" in data and dashboard_hash in data.get("OPENSEARCH_DASHBOARD_URL", ""):
+            data["OPENSEARCH_COOKIE"] = new_cookie
+            count += 1
+        for v in data.values():
+            count += update_cookie(v, dashboard_hash, new_cookie)
+    elif isinstance(data, list):
+        for item in data:
+            count += update_cookie(item, dashboard_hash, new_cookie)
+    return count
+
+def main():
+    if len(sys.argv) != 3:
+        print("Uso: update-opensearch-cookie <qa|prod|dev> '<cookie>'")
+        sys.exit(1)
+
+    env = sys.argv[1].lower()
+    cookie = sys.argv[2]
+
+    if env not in ENV_DASHBOARD_URLS:
+        print(f"Ambiente invalido: {env}. Use: qa, prod ou dev")
+        sys.exit(1)
+
+    claude_json = Path.home() / ".claude.json"
+    if not claude_json.exists():
+        print(f"Arquivo nao encontrado: {claude_json}")
+        sys.exit(1)
+
+    with open(claude_json, "r") as f:
+        data = json.load(f)
+
+    dashboard_hash = ENV_DASHBOARD_URLS[env]
+    updated = update_cookie(data, dashboard_hash, cookie)
+
+    if updated == 0:
+        print(f"Nenhuma entrada encontrada para o ambiente {env.upper()}")
+        sys.exit(1)
+
+    with open(claude_json, "w") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+
+    print(f"Cookie {env.upper()} atualizado em {updated} local(is) no {claude_json}")
+    print(f"Reinicie o Claude Code para aplicar (saia e entre novamente)")
+
+if __name__ == "__main__":
+    main()

@@ -72,6 +72,12 @@ claude mcp add opensearch-qa -s user \
   -e OPENSEARCH_DASHBOARD_URL="https://dashboards-sf-<id-qa>.cls.eu20.hana.ondemand.com" \
   -e OPENSEARCH_COOKIE="security_authentication=..." \
   -- node /caminho/para/opensearch-mcp/index.js
+
+# Ambiente de DEV
+claude mcp add opensearch-dev -s user \
+  -e OPENSEARCH_DASHBOARD_URL="https://dashboards-sf-<id-dev>.cls.eu20.hana.ondemand.com" \
+  -e OPENSEARCH_COOKIE="security_authentication=..." \
+  -- node /caminho/para/opensearch-mcp/index.js
 ```
 
 Use `-s user` para escopo global (disponível em todos os projetos) ou `-s local` para escopo do projeto.
